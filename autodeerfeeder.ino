@@ -8,6 +8,12 @@
 #include <Wire.h>
 #include <DS3231.h>
 
+#define ALARM1_HR 23
+#define ALARM1_M 39
+#define ALARM1_S 30
+#define ALARM1_INTPIN 7
+#define RELAY_PIN 8
+
 /*******************************/
 // global variables for date time
 byte hr;
@@ -17,6 +23,13 @@ byte dow; // day of week, 1-7
 byte date;  // 1-31
 byte mo;
 byte yr;
+byte Alarm1Bits = 0x08; // 1000 in binary. Alarm when hour, min, sec match
+bool A1Dy = true;
+bool A1h12 = false;
+bool A1PM = false;
+
+volatile bool alarmTriggered = false;
+
 char instr[20]; // allocate 20 bytes for date string coming over serial. terminate with '\0'
 const char notdt[26] = "Invalid date and/or time!";
 const byte not_thone[4] = { 4, 6, 9, 11 }; // months not with 31 days
@@ -29,16 +42,26 @@ void retDateTime();
 bool validDateTime();
 void setDateTime();
 void printDateTime();
+void alarmTrigger();
 /*******************************/
 
 // initialize clock object
 DS3231 dtclock;
 DateTime dt;
 
+
 void setup() {
   // initialize serial and i2c interfaces
   Serial.begin(9600);
   Wire.begin();
+
+  pinMode(ALARM1_INTPIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(ALARM1_INTPIN), alarmTrigger, FALLING);
+
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);
+
+  alarm();
 }
 
 void loop() {
@@ -51,11 +74,6 @@ void loop() {
         printDateTime();
         break;
       case 'w':
-        char garble;
-        while (Serial.available() > 0) {
-          garble = Serial.read();
-          //Serial.print(garble);
-        }
         retDateTime();
         if (!validDateTime()) {
           Serial.println(notdt);
@@ -65,7 +83,41 @@ void loop() {
         printDateTime();
         }
         break;
+      //case 'a':
+       // alarm();
+        //break;
+      case 'y':
+        dtclock.turnOnAlarm(1);
+        if (dtclock.checkAlarmEnabled(1)) {
+          Serial.println("Alarm 1 is enabled.");
+        }
+        else {
+          Serial.println("Alarm 1 did not enable.");
+        }
+        break;
+      case 'n':
+        dtclock.turnOffAlarm(1);
+        dtclock.checkIfAlarm(1);
+        if (!dtclock.checkAlarmEnabled(1)) {
+          Serial.println("Alarm 1 is disabled.");
+        }
+        else {
+          Serial.println("Alarm 1 did not disable.");
+        }
+        break;
+      case 'z':
+        if (dtclock.checkAlarmEnabled(1)) {
+          Serial.println("Alarm 1 is enabled.");
+        }
+        else {
+          Serial.println("Alarm 1 is disabled.");
+        }
+        break;
     }
+  }
+
+  if (alarmTriggered == true) {
+    feeder();
   }
 }
 
@@ -92,7 +144,7 @@ void retDateTime() {
       }
       else {
         instr[i] = inchar;
-        i++;
+        ++i;
       }
       if (inchar == '$') {
         instr[i] = '\0';
@@ -106,7 +158,7 @@ void retDateTime() {
 
 /*******************************/
 // begin validDateTime function
-// checks that date time input is valid
+// checks that date time input is valid and write to appropriate variables
 bool validDateTime() {
   byte temp1, temp2;
 
@@ -231,4 +283,33 @@ void printDateTime() {
   Serial.println(dt.second());
 }
 // end printDateTime function
+/*******************************/
+
+/*******************************/
+// begin alarm function
+void alarm() {
+  // is dow value arbitrary for 0x08?
+  dtclock.setA1Time(7, ALARM1_HR, ALARM1_M, ALARM1_S, Alarm1Bits, A1Dy, A1h12, A1PM);
+}
+// end alarm function
+/*******************************/
+
+/*******************************/
+// begin alarmTrigger function from interrupt
+void alarmTrigger() {
+  alarmTriggered = true;
+}
+// end alarmTrigger function
+/*******************************/
+
+/*******************************/
+// begin alarmTrigger function
+void feeder() {
+  dtclock.checkIfAlarm(1);
+  alarmTriggered = false;
+  digitalWrite(RELAY_PIN, LOW);
+  delay(2000);
+  digitalWrite(RELAY_PIN, HIGH);
+}
+// end alarmTrigger function
 /*******************************/
