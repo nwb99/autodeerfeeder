@@ -305,8 +305,12 @@ void alarmTrigger() {
 /*******************************/
 // begin alarmTrigger function
 void feeder() {
-  dtclock.checkIfAlarm(1);
+  /*** reset alarm ***/
   alarmTriggered = false;
+  dtclock.checkIfAlarm(1);
+  /*******************/
+
+  // trigger relay by pulling low
   digitalWrite(RELAY_PIN, LOW);
   delay(2000);
   digitalWrite(RELAY_PIN, HIGH);
