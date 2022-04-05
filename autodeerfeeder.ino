@@ -11,8 +11,10 @@
 #define ALARM1_HR 23
 #define ALARM1_M 39
 #define ALARM1_S 30
-#define ALARM1_INTPIN 7
-#define RELAY_PIN 8
+#define ALARM1_INTPIN 2
+#define RELAY_PIN 5
+
+#define BUTTON 8
 
 /*******************************/
 // global variables for date time
@@ -61,10 +63,17 @@ void setup() {
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, HIGH);
 
+  pinMode(BUTTON, INPUT_PULLUP);
+
   alarm();
 }
 
 void loop() {
+
+  if (digitalRead(BUTTON) == LOW) {
+    feeder();
+  }
+  
   if (Serial.available() > 0) {
     char in;
     in = Serial.read();
